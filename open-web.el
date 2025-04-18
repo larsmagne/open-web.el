@@ -26,26 +26,41 @@
     open-web-same-window)
   "A list of functions to be used for different numbers of `C-u' prefixes.")
 
+(defvar open-web-reverse-method-regexps nil
+  "A list of regexps (to match URLs) to reverse actions.
+That is, if an URL matches any of the regexps in this list, `C-u'
+ will use the first action in `open-web-methods' and no `C-u'
+ will use the second.")
+
 (defvar open-web-browser #'browse-url-firefox)
 
 (defun open-web (url &optional _)
   "Open a web page using `open-web-methods'.
 Different methods will be selected based on how many `C-u's the
 user has tapped."
-  (let* ((prefix (if (consp current-prefix-arg)
-		    (truncate (log (car current-prefix-arg) 4))
-		  0))
-	 (method (elt open-web-methods prefix)))
-    (unless method
-      (user-error "No method for selection number %d" (1+ prefix)))
-    (funcall method url)))
+  (let ((methods open-web-methods))
+    (when (seq-filter (lambda (elem)
+			(string-match-p elem url))
+		      open-web-reverse-method-regexps)
+      (setq methods (list (nth 1 methods)
+			  (nth 0 methods)
+			  (nth 2 methods))))
+    (let* ((prefix (if (consp current-prefix-arg)
+		       (truncate (log (car current-prefix-arg) 4))
+		     0))
+	   (method (elt methods prefix)))
+      (unless method
+	(user-error "No method for selection number %d" (1+ prefix)))
+      (funcall method url))))
 
 (defun open-webs (urls)
   "Open multiple URLs in the same window."
-  (open-web-new-window (pop urls))
-  (sleep-for 2)
-  (dolist (url urls)
-    (open-web-same-window url)))
+  (when urls
+    (open-web-new-window (pop urls))
+    (sleep-for 2)
+    (dolist (url urls)
+      (open-web-same-window url)
+      (sleep-for 0.2))))
 
 (defun open-web-new-window (url)
   (let ((browse-url-new-window-flag t))
